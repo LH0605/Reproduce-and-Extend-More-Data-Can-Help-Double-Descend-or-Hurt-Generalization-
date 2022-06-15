@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.utils.data as Data
-import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -9,7 +8,7 @@ mu = 1
 sigma = 2
 learning_rate = 1e-1
 # epsilon = 1.5
-num_epochs = 4
+num_epochs = 9
 W = 3
 TEST_SIZE = 50
 TRAIN_SIZE = 30
@@ -77,17 +76,15 @@ def fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon):
 
 def main():
     loss_fn = linear_loss
-    test_losses = np.zeros(TRAIN_SIZE)
 
-    epsilons = [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1.0, 1.1, 1.3, 1.5, 1.7, 2.0, 2.5, 3.0]
-    for epsilon in epsilons:
-        print("epsilon:", epsilon)
-    # epsilon = 0.7
-    # if True:
+    epsilons = [0, 0.7, 1.5, 2.5, 2.7, 3.0]
+    test_losses = np.zeros((len(epsilons), TRAIN_SIZE))
+    for i in range(len(epsilons)):
+        epsilon = epsilons[i]
         for train_size in range(1, TRAIN_SIZE+1):
-            N = 50
+            N = 100
             temp = np.zeros(N)
-            for i in range(N):
+            for j in range(N):
                 model = nn.Linear(1, 1, bias=False)
                 opt = torch.optim.Adam(model.parameters(), lr=learning_rate)
                 batch_size = min(5, train_size)
@@ -96,20 +93,31 @@ def main():
                 train_set = Data.TensorDataset(x_train, y_train)
                 train_loader = Data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
                 test_loss = fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon)
-                temp[i] = test_loss.item()
+                temp[j] = test_loss.item()
             mean = np.mean(temp)
-            test_losses[train_size-1] = test_loss.item()
+            test_losses[i, train_size-1] = mean.item()
 
-        print("test_losses:", test_losses)
-        train_sizes = np.arange(1, TRAIN_SIZE+1)
-        plt.plot(train_sizes, test_losses, label=f"Ɛ = {epsilon}")
-        plt.title("Gaussian Mixture with Linear Loss")
-        plt.xlabel("Size of Training Dataset")
-        plt.ylabel("Test Loss")
-        # plt.legend(loc='best')
-        plt.savefig(f"linear.png")
-        # plt.savefig(f"linear_{epsilon}.png")
-        plt.clf()
+    print("test_losses:", test_losses)
+    
+    train_sizes = np.arange(1, TRAIN_SIZE+1)
+    plt.title("Gaussian Mixture with Linear Loss (weak)")
+    plt.xlabel("Size of Training Dataset")
+    plt.ylabel("Test Loss")
+    for i in range(len(epsilons[:3])):
+        epsilon = epsilons[i]
+        plt.plot(train_sizes, test_losses[i], label=f"Ɛ = {epsilon}")
+    plt.legend(loc="best")
+    plt.savefig(f"linear_weak.png")
+    plt.clf()
+    
+    plt.title("Gaussian Mixture with Linear Loss (strong)")
+    plt.xlabel("Size of Training Dataset")
+    plt.ylabel("Test Loss")
+    for i in range(len(epsilons[3:])):
+        epsilon = epsilons[3+i]
+        plt.plot(train_sizes, test_losses[3+i], label=f"Ɛ = {epsilon}")
+    plt.legend(loc="best")
+    plt.savefig(f"linear_strong.png")
 
 
 if __name__ == "__main__":

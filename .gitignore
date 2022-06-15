@@ -1,2 +1,5 @@
 .ipynb_checkpoints/
 *.pt
+.DS_Store
+*.png
+*.log

@@ -1,18 +1,18 @@
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.utils.data as Data
 from torch.optim import SGD, Adam
+import matplotlib.pyplot as plt
 
 mu = torch.ones(2)
 sigma = torch.eye(2)
 learning_rate = 1e-1
 # epsilon = 3.
-num_epochs = 7
+num_epochs = 10
 c = 0.1
-TEST_SIZE = 50
-TRAIN_SIZE = 50
+TEST_SIZE = 1000
+TRAIN_SIZE = 30
 BEST_MODEL_PATH = 'best_svm_model.pt'
 
 x_test = torch.cat([torch.distributions.MultivariateNormal(-mu, sigma).sample((TEST_SIZE,)), torch.distributions.MultivariateNormal(mu, sigma).sample((TEST_SIZE,))]).float()
@@ -84,12 +84,12 @@ def fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon):
     return sum_test_loss / TEST_SIZE
 
 def main():
-    epsilons = [0, 0.4, 0.8, 1.1, 1.3, 1.5, 2.0, 2.4, 3.0]
+    epsilons = [0, 0.4, 0.6, 0.8, 1.1, 1.3, 1.5, 2.0, 2.5, 3.0]
     test_losses = np.zeros((len(epsilons), TRAIN_SIZE))
     for i in range(len(epsilons)):
         epsilon = epsilons[i]
         for train_size in range(1, TRAIN_SIZE+1):
-            N = 50
+            N = 100
             temp = np.zeros(N)
             for j in range(N):
                 model = nn.Linear(2, 1)
@@ -105,35 +105,39 @@ def main():
             test_losses[i, train_size-1] = mean.item()
 
     print("test_losses:", test_losses)
-            
+
+    step = 3
     train_sizes = np.arange(1, TRAIN_SIZE+1)
     plt.title("SVM with Hinge Loss (weak)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
-    for i in range(len(epsilons[:3])):
-        epsilon = epsilons[i]
-        plt.plot(train_sizes, test_losses[i], label=f"Ɛ = {epsilon}")
-    plt.legend(loc='best')
+    plt.plot(train_sizes, test_losses[0], 'b--', label=f"Ɛ = 0")
+    for i in range(len(epsilons[1:1+step])):
+        epsilon = epsilons[1+i]
+        plt.plot(train_sizes, test_losses[1+i], label=f"Ɛ = {epsilon}")
+    plt.legend(loc="best")
     plt.savefig(f"svm_weak.png")
     plt.clf()
-    
+
     plt.title("SVM with Hinge Loss (medium)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
-    for i in range(len(epsilons[3:6])):
-        epsilon = epsilons[3+i]
-        plt.plot(train_sizes, test_losses[3+i], label=f"Ɛ = {epsilon}")
-    plt.legend(loc='best')
+    plt.plot(train_sizes, test_losses[0], 'b--', label=f"Ɛ = 0")
+    for i in range(len(epsilons[1+step:1+(2*step)])):
+        epsilon = epsilons[1+step+i]
+        plt.plot(train_sizes, test_losses[1+step+i], label=f"Ɛ = {epsilon}")
+    plt.legend(loc="best")
     plt.savefig(f"svm_medium.png")
     plt.clf()
     
     plt.title("SVM with Hinge Loss (strong)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
-    for i in range(len(epsilons[6:])):
-        epsilon = epsilons[6+i]
-        plt.plot(train_sizes, test_losses[6+i], label=f"Ɛ = {epsilon}")
-    plt.legend(loc='best')
+    plt.plot(train_sizes, test_losses[0], 'b--', label=f"Ɛ = 0")
+    for i in range(len(epsilons[1+(2*step):])):
+        epsilon = epsilons[1+(2*step)+i]
+        plt.plot(train_sizes, test_losses[1+(2*step)+i], label=f"Ɛ = {epsilon}")
+    plt.legend(loc="best")
     plt.savefig(f"svm_strong.png")
 
 if __name__ == "__main__":

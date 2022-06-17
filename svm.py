@@ -45,7 +45,6 @@ def fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon):
         sum_loss = 0
         for x, y in train_loader:
             opt.zero_grad()
-            # print("epsilon fgsm:", epsilon)
             delta = fgsm(model, x, y, epsilon)
             # perturbed training data
             x_pert = x + delta
@@ -63,10 +62,8 @@ def fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon):
         if epoch_train_loss < best_loss:
             best_loss = epoch_train_loss
             torch.save(model.state_dict(), BEST_MODEL_PATH)
-#         print("Epoch:", epoch)
-#         print("Training loss:", sum_loss / train_size)
-    # calc test loss
 
+    # calc test loss
     sum_test_loss = 0
     model = nn.Linear(2, 1)
     model.load_state_dict(torch.load(BEST_MODEL_PATH))
@@ -76,8 +73,6 @@ def fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon):
     for x, y in test_loader:
         loss = test_hinge_loss(x, y, weight, bias)
         sum_test_loss += loss
-    #     print('Training loss: ', loss_fn(model(x_train), y_train))
-#     print('Test loss: ', test_loss / test_size)
     return sum_test_loss / TEST_SIZE
 
 def main():
@@ -102,7 +97,6 @@ def main():
                 temp[j] = test_loss.item()
             mean = np.mean(temp)
             test_losses[i, train_size-1] = mean.item()
-            # test_losses[i, train_size-1] = test_loss.item()
 
     print("test_losses:", test_losses)
 

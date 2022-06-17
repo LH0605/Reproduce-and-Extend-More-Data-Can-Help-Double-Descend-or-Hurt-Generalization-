@@ -10,9 +10,9 @@ sigma = 2
 learning_rate = 1e-1
 # epsilon = 1.5
 num_epochs = 100
-W = 1.3
-TEST_SIZE = 5000
-TRAIN_SIZE = 50
+W = 1.
+TEST_SIZE = 10000
+TRAIN_SIZE = 30
 BEST_MODEL_PATH = 'best_gaussian_mixture_linear_loss_model.pt'
 
 class WeightClipper(object):
@@ -42,10 +42,9 @@ def fgsm(model, x, y, loss_fn, epsilon):
 
 def fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon):
     model.train()
+    best_loss = float('inf')
     for epoch in range(num_epochs):
         sum_loss = 0
-        best_loss = float('inf')
-        
         for x, y in train_loader:
             opt.zero_grad()
             delta = fgsm(model, x, y, loss_fn, epsilon)
@@ -77,25 +76,28 @@ def fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon):
 def main():
     loss_fn = linear_loss
 
-    epsilons = [0, 0.1, 0.3, 0.5, 1.3, 1.3, 1.7, 2.5, 2.7, 3.0]
+    epsilons = [0, 0.3, 0.5, 0.7, 1.1, 1.3, 1.5, 2.5, 2.7, 3.0]
     test_losses = np.zeros((len(epsilons), TRAIN_SIZE))
     for i in range(len(epsilons)):
         epsilon = epsilons[i]
         for train_size in range(1, TRAIN_SIZE+1):
-            N = 100
-            temp = np.zeros(N)
-            for j in range(N):
-                model = nn.Linear(1, 1, bias=False)
-                opt = Adam(model.parameters(), lr=learning_rate)
-                batch_size = min(5, train_size)
-                x_train = torch.unsqueeze(torch.cat([torch.distributions.Normal(-mu, sigma).sample((train_size,)), torch.distributions.Normal(mu, sigma).sample((train_size,))]), dim=1).float()
-                y_train = torch.unsqueeze(torch.cat([-torch.ones(train_size), torch.ones(train_size)]), dim=1).float()
-                train_set = Data.TensorDataset(x_train, y_train)
-                train_loader = Data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
-                test_loss = fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon)
-                temp[j] = test_loss.item()
-            mean = np.mean(temp)
-            test_losses[i, train_size-1] = mean.item()
+            # N = 100
+            # temp = np.zeros(N)
+            # for j in range(N):
+            
+            model = nn.Linear(1, 1, bias=False)
+            opt = Adam(model.parameters(), lr=learning_rate)
+            batch_size = min(5, train_size)
+            x_train = torch.unsqueeze(torch.cat([torch.distributions.Normal(-mu, sigma).sample((train_size,)), torch.distributions.Normal(mu, sigma).sample((train_size,))]), dim=1).float()
+            y_train = torch.unsqueeze(torch.cat([-torch.ones(train_size), torch.ones(train_size)]), dim=1).float()
+            train_set = Data.TensorDataset(x_train, y_train)
+            train_loader = Data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
+            test_loss = fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon)
+            
+            #     temp[j] = test_loss.item()
+            # mean = np.mean(temp)
+            # test_losses[i, train_size-1] = mean.item()
+            test_losses[i, train_size-1] = test_loss.item()
 
     print("test_losses:", test_losses)
     
@@ -104,7 +106,7 @@ def main():
     plt.title("Gaussian Mixture with Linear Loss (weak)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
-    plt.plot(train_sizes, test_losses[0], 'b--', label=f"Ɛ = 0")
+    plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
     for i in range(len(epsilons[1:1+step])):
         epsilon = epsilons[1+i]
         plt.plot(train_sizes, test_losses[1+i], label=f"Ɛ = {epsilon}")
@@ -115,7 +117,7 @@ def main():
     plt.title("Gaussian Mixture with Linear Loss (medium)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
-    plt.plot(train_sizes, test_losses[0], 'b--', label=f"Ɛ = 0")
+    plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
     for i in range(len(epsilons[1+step:1+(2*step)])):
         epsilon = epsilons[1+step+i]
         plt.plot(train_sizes, test_losses[1+step+i], label=f"Ɛ = {epsilon}")
@@ -126,7 +128,7 @@ def main():
     plt.title("Gaussian Mixture with Linear Loss (strong)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
-    plt.plot(train_sizes, test_losses[0], 'b--', label=f"Ɛ = 0")
+    plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
     for i in range(len(epsilons[1+(2*step):])):
         epsilon = epsilons[1+(2*step)+i]
         plt.plot(train_sizes, test_losses[1+(2*step)+i], label=f"Ɛ = {epsilon}")

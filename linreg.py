@@ -5,15 +5,16 @@ import torch.utils.data as Data
 from torch.optim import SGD, Adam
 import matplotlib.pyplot as plt
 
+# NOTE: USE "Linear Regression.ipynb" RATHER THAN THIS FILE FOR NOW
 mu = 0
 sigma = 1
 learning_rate = 1e-1
 # epsilon = 3.
 num_epochs = 100
 c = 0.1
-TEST_SIZE = 5000 # TODO: change to 5k!
-TRAIN_SIZE = 50
-BEST_MODEL_PATH = 'best_linalg_model.pt'
+TEST_SIZE = 500 # TODO: change to 5k!
+TRAIN_SIZE = 30
+BEST_MODEL_PATH = 'best_linreg_model.pt'
 
 low, high = 1, 5
 w_star = low + torch.rand(1) * (high - low)
@@ -41,9 +42,9 @@ def fgsm(model, x, y, epsilon):
 
 def fit(num_epochs, train_loader, model, opt, train_size, epsilon):
     model.train()
+    best_loss = float('inf')
     for epoch in range(num_epochs):
         sum_loss = 0
-        best_loss = float('inf')
         for x, y in train_loader:
             opt.zero_grad()
             delta = fgsm(model, x, y, epsilon)
@@ -107,34 +108,34 @@ def main():
     plt.title("Linear Regression Gaussian (weak)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
-    plt.plot(train_sizes, test_losses[0], 'b--', label=f"Ɛ = 0")
+    plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
     for i in range(len(epsilons[1:1+step])):
         epsilon = epsilons[1+i]
         plt.plot(train_sizes, test_losses[1+i], label=f"Ɛ = {epsilon}")
     plt.legend(loc="best")
-    plt.savefig(f"linalg_gaussian_weak.png")
+    plt.savefig(f"linreg_gaussian_weak.png")
     plt.clf()
     
     plt.title("Linear Regression Gaussian (medium)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
-    plt.plot(train_sizes, test_losses[0], 'b--', label=f"Ɛ = 0")
+    plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
     for i in range(len(epsilons[1+step:1+(2*step)])):
         epsilon = epsilons[1+step+i]
         plt.plot(train_sizes, test_losses[1+step+i], label=f"Ɛ = {epsilon}")
     plt.legend(loc="best")
-    plt.savefig(f"linalg_gaussian_medium.png")
+    plt.savefig(f"linreg_gaussian_medium.png")
     plt.clf()
     
     plt.title("Linear Regression Gaussian (strong)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
-    plt.plot(train_sizes, test_losses[0], 'b--', label=f"Ɛ = 0")
+    plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
     for i in range(len(epsilons[1+(2*step):])):
         epsilon = epsilons[1+(2*step)+i]
         plt.plot(train_sizes, test_losses[1+(2*step)+i], label=f"Ɛ = {epsilon}")
     plt.legend(loc="best")
-    plt.savefig(f"linalg_gaussian_strong.png")
+    plt.savefig(f"linreg_gaussian_strong.png")
 
 if __name__ == "__main__":
     main()

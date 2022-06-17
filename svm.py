@@ -11,7 +11,7 @@ learning_rate = 1e-1
 # epsilon = 3.
 num_epochs = 10
 c = 0.1
-TEST_SIZE = 1000
+TEST_SIZE = 10000
 TRAIN_SIZE = 30
 BEST_MODEL_PATH = 'best_svm_model.pt'
 
@@ -40,9 +40,9 @@ def fgsm(model, x, y, epsilon):
 
 def fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon):
     model.train()
+    best_loss = float('inf')
     for epoch in range(num_epochs):
         sum_loss = 0
-        best_loss = float('inf')
         for x, y in train_loader:
             opt.zero_grad()
             # print("epsilon fgsm:", epsilon)
@@ -89,20 +89,23 @@ def main():
     for i in range(len(epsilons)):
         epsilon = epsilons[i]
         for train_size in range(1, TRAIN_SIZE+1):
-            N = 100
-            temp = np.zeros(N)
-            for j in range(N):
-                model = nn.Linear(2, 1)
-                opt = Adam(model.parameters(), lr=learning_rate)
-                batch_size = min(5, train_size)
-                x_train = torch.cat([torch.distributions.MultivariateNormal(-mu, sigma).sample((train_size,)), torch.distributions.MultivariateNormal(mu, sigma).sample((train_size,))]).float()
-                y_train = torch.unsqueeze(torch.cat([-torch.ones(train_size), torch.ones(train_size)]), dim=1).float()
-                train_set = Data.TensorDataset(x_train, y_train)
-                train_loader = Data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
-                test_loss = fit(num_epochs, train_loader, model, test_hinge_loss, opt, train_size, epsilon)
-                temp[j] = test_loss.item()
-            mean = np.mean(temp)
-            test_losses[i, train_size-1] = mean.item()
+            # N = 100
+            # temp = np.zeros(N)
+            # for j in range(N):
+            
+            model = nn.Linear(2, 1)
+            opt = Adam(model.parameters(), lr=learning_rate)
+            batch_size = min(5, train_size)
+            x_train = torch.cat([torch.distributions.MultivariateNormal(-mu, sigma).sample((train_size,)), torch.distributions.MultivariateNormal(mu, sigma).sample((train_size,))]).float()
+            y_train = torch.unsqueeze(torch.cat([-torch.ones(train_size), torch.ones(train_size)]), dim=1).float()
+            train_set = Data.TensorDataset(x_train, y_train)
+            train_loader = Data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
+            test_loss = fit(num_epochs, train_loader, model, test_hinge_loss, opt, train_size, epsilon)
+                
+            #     temp[j] = test_loss.item()
+            # mean = np.mean(temp)
+            # test_losses[i, train_size-1] = mean.item()
+            test_losses[i, train_size-1] = test_loss.item()
 
     print("test_losses:", test_losses)
 
@@ -111,7 +114,7 @@ def main():
     plt.title("SVM with Hinge Loss (weak)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
-    plt.plot(train_sizes, test_losses[0], 'b--', label=f"Ɛ = 0")
+    plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
     for i in range(len(epsilons[1:1+step])):
         epsilon = epsilons[1+i]
         plt.plot(train_sizes, test_losses[1+i], label=f"Ɛ = {epsilon}")
@@ -122,7 +125,7 @@ def main():
     plt.title("SVM with Hinge Loss (medium)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
-    plt.plot(train_sizes, test_losses[0], 'b--', label=f"Ɛ = 0")
+    plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
     for i in range(len(epsilons[1+step:1+(2*step)])):
         epsilon = epsilons[1+step+i]
         plt.plot(train_sizes, test_losses[1+step+i], label=f"Ɛ = {epsilon}")
@@ -133,7 +136,7 @@ def main():
     plt.title("SVM with Hinge Loss (strong)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
-    plt.plot(train_sizes, test_losses[0], 'b--', label=f"Ɛ = 0")
+    plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
     for i in range(len(epsilons[1+(2*step):])):
         epsilon = epsilons[1+(2*step)+i]
         plt.plot(train_sizes, test_losses[1+(2*step)+i], label=f"Ɛ = {epsilon}")

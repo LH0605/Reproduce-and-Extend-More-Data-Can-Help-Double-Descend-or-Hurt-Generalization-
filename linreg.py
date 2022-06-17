@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import torch
 import torch.nn as nn
@@ -12,12 +13,14 @@ learning_rate = 1e-1
 # epsilon = 3.
 num_epochs = 100
 c = 0.1
-TEST_SIZE = 500 # TODO: change to 5k!
+TEST_SIZE = 10000 # TODO: change to 5k!
 TRAIN_SIZE = 30
-BEST_MODEL_PATH = 'best_linreg_model.pt'
+BEST_MODEL_PATH = 'best_linreg_model_poisson.pt'
+# GAUSSIAN = False # true if x is standard normal, otherwise Poisson(5) + 1
 
 low, high = 1, 5
 w_star = low + torch.rand(1) * (high - low)
+print('w_star: ', w_star)
 e = torch.randn(TEST_SIZE, 1)
 x_test = torch.randn(TEST_SIZE, 1)
 y_test = w_star * x_test + e
@@ -63,8 +66,9 @@ def fit(num_epochs, train_loader, model, opt, train_size, epsilon):
         if epoch_train_loss < best_loss:
             best_loss = epoch_train_loss
             torch.save(model.state_dict(), BEST_MODEL_PATH)
-#         print("Epoch:", epoch)
-#         print("Training loss:", sum_loss / train_size)
+            print('best w: ', weight)
+        print("Epoch:", epoch)
+        print("Training loss:", epoch_train_loss)
 
     # calc test loss
     sum_test_loss = 0
@@ -75,12 +79,19 @@ def fit(num_epochs, train_loader, model, opt, train_size, epsilon):
         weight = model.weight.t()
         loss = test_loss(weight)
         sum_test_loss += loss
-    #     print('Training loss: ', loss_fn(model(x_train), y_train))
-#     print('Test loss: ', test_loss / test_size)
+    print('Test loss: ', sum_test_loss / TEST_SIZE, "Weight: ", weight)
     return sum_test_loss / TEST_SIZE
 
 def main():
-    epsilons = [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0, 2.5, 3.0]
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--gaussian', action='store_true')
+    args = parser.parse_args()
+    print('args: ', args)
+    if args.gaussian:
+        epsilons = [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0, 2.5, 3.0]
+        BEST_MODEL_PATH = 'best_linreg_model_gaussian.pt'
+    else:
+        epsilons = [0, 1., 2., 3., 4., 5., 6., 8., 10., 12.]
     test_losses = np.zeros((len(epsilons), TRAIN_SIZE))
     for i in range(len(epsilons)):
         epsilon = epsilons[i]
@@ -92,7 +103,10 @@ def main():
                 opt = Adam(model.parameters(), lr=learning_rate)
                 batch_size = min(5, train_size)
                 e = torch.randn(TRAIN_SIZE, 1)
-                x_train = torch.randn(TRAIN_SIZE, 1)
+                if args.gaussian:
+                    x_train = torch.randn(TRAIN_SIZE, 1)
+                else:
+                    x_train = torch.unsqueeze(torch.distributions.poisson.Poisson(5).sample((TRAIN_SIZE,)) + 1, dim=1).float()
                 y_train = w_star * x_train + e
                 train_set = Data.TensorDataset(x_train, y_train)
                 train_loader = Data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
@@ -105,7 +119,8 @@ def main():
 
     step = 3
     train_sizes = np.arange(1, TRAIN_SIZE+1)
-    plt.title("Linear Regression Gaussian (weak)")
+    title_model = "Gaussian" if args.gaussian else "Poisson"
+    plt.title(f"Linear Regression {title_model} (weak)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
     plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
@@ -113,10 +128,10 @@ def main():
         epsilon = epsilons[1+i]
         plt.plot(train_sizes, test_losses[1+i], label=f"Ɛ = {epsilon}")
     plt.legend(loc="best")
-    plt.savefig(f"linreg_gaussian_weak.png")
+    plt.savefig(f"linreg_{title_model.lower()}_weak.png")
     plt.clf()
     
-    plt.title("Linear Regression Gaussian (medium)")
+    plt.title(f"Linear Regression {title_model} (medium)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
     plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
@@ -124,10 +139,10 @@ def main():
         epsilon = epsilons[1+step+i]
         plt.plot(train_sizes, test_losses[1+step+i], label=f"Ɛ = {epsilon}")
     plt.legend(loc="best")
-    plt.savefig(f"linreg_gaussian_medium.png")
+    plt.savefig(f"linreg_{title_model.lower()}_medium.png")
     plt.clf()
     
-    plt.title("Linear Regression Gaussian (strong)")
+    plt.title(f"Linear Regression {title_model} (strong)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
     plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
@@ -135,7 +150,7 @@ def main():
         epsilon = epsilons[1+(2*step)+i]
         plt.plot(train_sizes, test_losses[1+(2*step)+i], label=f"Ɛ = {epsilon}")
     plt.legend(loc="best")
-    plt.savefig(f"linreg_gaussian_strong.png")
+    plt.savefig(f"linreg_{title_model.lower()}_strong.png")
 
 if __name__ == "__main__":
     main()

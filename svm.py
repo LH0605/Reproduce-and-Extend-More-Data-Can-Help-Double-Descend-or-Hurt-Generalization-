@@ -9,7 +9,7 @@ mu = torch.ones(2)
 sigma = torch.eye(2)
 learning_rate = 1e-1
 # epsilon = 3.
-num_epochs = 10
+num_epochs = 100
 c = 0.1
 TEST_SIZE = 10000
 TRAIN_SIZE = 30
@@ -51,9 +51,6 @@ def fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon):
             x_pert = x + delta
             # predicted output
             y_pred = model(x_pert)
-#             print(x[0])
-#             print('---')
-#             print(x_pert[0])
         
 #             y_pred = model(x)
             weight = model.weight.t() # .squeeze()
@@ -74,9 +71,9 @@ def fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon):
     model = nn.Linear(2, 1)
     model.load_state_dict(torch.load(BEST_MODEL_PATH))
     model.eval()
+    weight = model.weight.t()
+    bias = model.bias
     for x, y in test_loader:
-        weight = model.weight.t()
-        bias = model.bias
         loss = test_hinge_loss(x, y, weight, bias)
         sum_test_loss += loss
     #     print('Training loss: ', loss_fn(model(x_train), y_train))
@@ -89,23 +86,23 @@ def main():
     for i in range(len(epsilons)):
         epsilon = epsilons[i]
         for train_size in range(1, TRAIN_SIZE+1):
-            # N = 100
-            # temp = np.zeros(N)
-            # for j in range(N):
+            N = 100
+            temp = np.zeros(N)
+            for j in range(N):
             
-            model = nn.Linear(2, 1)
-            opt = Adam(model.parameters(), lr=learning_rate)
-            batch_size = min(5, train_size)
-            x_train = torch.cat([torch.distributions.MultivariateNormal(-mu, sigma).sample((train_size,)), torch.distributions.MultivariateNormal(mu, sigma).sample((train_size,))]).float()
-            y_train = torch.unsqueeze(torch.cat([-torch.ones(train_size), torch.ones(train_size)]), dim=1).float()
-            train_set = Data.TensorDataset(x_train, y_train)
-            train_loader = Data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
-            test_loss = fit(num_epochs, train_loader, model, test_hinge_loss, opt, train_size, epsilon)
+                model = nn.Linear(2, 1)
+                opt = Adam(model.parameters(), lr=learning_rate)
+                batch_size = min(5, train_size)
+                x_train = torch.cat([torch.distributions.MultivariateNormal(-mu, sigma).sample((train_size,)), torch.distributions.MultivariateNormal(mu, sigma).sample((train_size,))]).float()
+                y_train = torch.unsqueeze(torch.cat([-torch.ones(train_size), torch.ones(train_size)]), dim=1).float()
+                train_set = Data.TensorDataset(x_train, y_train)
+                train_loader = Data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
+                test_loss = fit(num_epochs, train_loader, model, test_hinge_loss, opt, train_size, epsilon)
                 
-            #     temp[j] = test_loss.item()
-            # mean = np.mean(temp)
-            # test_losses[i, train_size-1] = mean.item()
-            test_losses[i, train_size-1] = test_loss.item()
+                temp[j] = test_loss.item()
+            mean = np.mean(temp)
+            test_losses[i, train_size-1] = mean.item()
+            # test_losses[i, train_size-1] = test_loss.item()
 
     print("test_losses:", test_losses)
 

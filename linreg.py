@@ -6,20 +6,17 @@ import torch.utils.data as Data
 from torch.optim import SGD, Adam
 import matplotlib.pyplot as plt
 
-# NOTE: USE "Linear Regression.ipynb" RATHER THAN THIS FILE FOR NOW
 mu = 0
 sigma = 1
 learning_rate = 1e-1
-# epsilon = 3.
-num_epochs = 1000
-c = 0.1
-TEST_SIZE = 100 # TODO: change to 5k!
+num_epochs = 10
+TEST_SIZE = 1000 # TODO: change to 5k!
 TRAIN_SIZE = 30
-low, high = 1, 100
+low, high = 0., 2.
 
 
 def train_loss(output, target):
-    return nn.MSELoss()(output, target)
+    return nn.MSELoss(reduction="sum")(output, target)
 
 def test_loss(weight, w_star):
     return nn.MSELoss()(weight, w_star)
@@ -35,7 +32,7 @@ def fgsm(model, x, y, epsilon):
 
 def fit(num_epochs, train_loader, test_loader, model, opt, train_size, epsilon, w_star):
     model.train()
-    # best_loss = float('inf')
+    best_loss = float('inf')
     for epoch in range(num_epochs):
         sum_loss = 0
         for x, y in train_loader:
@@ -46,20 +43,19 @@ def fit(num_epochs, train_loader, test_loader, model, opt, train_size, epsilon, 
             # predicted output
             y_pred = model(x_pert)
         
-#             y_pred = model(x)
-            weight = model.weight # .squeeze()
+            weight = model.weight
             loss = train_loss(y_pred, y)
             loss.backward()
             opt.step()
-            # sum_loss += float(loss)
-        # epoch_train_loss = sum_loss / train_size
-        # print('BEST_MODEL_PATH: ', BEST_MODEL_PATH)
-        # if epoch_train_loss < best_loss:
-        #     best_loss = epoch_train_loss
+            sum_loss += float(loss)
+        epoch_train_loss = sum_loss / train_size
+        print('BEST_MODEL_PATH: ', BEST_MODEL_PATH)
+        if epoch_train_loss < best_loss:
+            best_loss = epoch_train_loss
         torch.save(model.state_dict(), BEST_MODEL_PATH)
-        #     print('best w: ', weight)
-        # print("Epoch:", epoch)
-        # print("Training loss:", epoch_train_loss)
+        print('best w: ', weight)
+        print("Epoch:", epoch)
+        print("Training loss:", epoch_train_loss)
 
     # calc test loss
     sum_test_loss = 0
@@ -70,7 +66,6 @@ def fit(num_epochs, train_loader, test_loader, model, opt, train_size, epsilon, 
     for x, y in test_loader:
         loss = test_loss(weight, w_star)
         sum_test_loss += loss
-    # print('Test loss: ', sum_test_loss / TEST_SIZE, "Weight: ", weight)
     return sum_test_loss / TEST_SIZE
 
 def main():
@@ -118,7 +113,6 @@ def main():
                 temp[j] = test_loss.item()
             mean = np.mean(temp)
             test_losses[i, train_size-1] = mean.item()
-
     print("test_losses:", test_losses)
 
     step = 3

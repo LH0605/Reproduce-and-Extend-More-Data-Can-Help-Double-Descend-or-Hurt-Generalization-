@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 mu = 1
 sigma = 2
 learning_rate = 1e-1
-# epsilon = 1.5
 num_epochs = 100
 W = 1.
 TEST_SIZE = 10000
@@ -97,8 +96,6 @@ def main():
                 temp[j] = test_loss.item()
             mean = np.mean(temp)
             test_losses[i, train_size-1] = mean.item()
-            # test_losses[i, train_size-1] = test_loss.item()
-
     print("test_losses:", test_losses)
     
     step = 3

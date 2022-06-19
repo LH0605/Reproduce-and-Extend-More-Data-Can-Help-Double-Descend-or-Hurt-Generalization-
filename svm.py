@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 mu = torch.ones(2)
 sigma = torch.eye(2)
 learning_rate = 1e-1
-# epsilon = 3.
 num_epochs = 100
 c = 0.1
 TEST_SIZE = 10000
@@ -51,8 +50,7 @@ def fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon):
             # predicted output
             y_pred = model(x_pert)
         
-#             y_pred = model(x)
-            weight = model.weight.t() # .squeeze()
+            weight = model.weight.t()
             bias = model.bias
             loss = train_hinge_loss(x_pert, y, weight, bias)
             loss.backward()
@@ -97,7 +95,6 @@ def main():
                 temp[j] = test_loss.item()
             mean = np.mean(temp)
             test_losses[i, train_size-1] = mean.item()
-
     print("test_losses:", test_losses)
 
     step = 3

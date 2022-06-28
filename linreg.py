@@ -102,16 +102,18 @@ def main():
                 print('w_star: ', w_star)
                 
                 e_train = torch.randn(train_size, 1)
+                e_test = torch.randn(TEST_SIZE, 1)
                 if args.gaussian:
                     x_train = torch.randn(train_size, 1)
+                    x_test = torch.randn(TEST_SIZE, 1)
                 else:
                     x_train = torch.unsqueeze(torch.distributions.poisson.Poisson(5).sample((train_size,)) + 1, dim=1).float()
+                    x_test = torch.unsqueeze(torch.distributions.poisson.Poisson(5).sample((TEST_SIZE,)) + 1, dim=1).float()
+                    
                 y_train = w_star * x_train + e_train
                 train_set = Data.TensorDataset(x_train, y_train)
                 train_loader = Data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
                 
-                e_test = torch.randn(TEST_SIZE, 1)
-                x_test = torch.randn(TEST_SIZE, 1)
                 y_test = w_star * x_test + e_test
                 test_set = Data.TensorDataset(x_test, y_test)
                 test_loader = Data.DataLoader(dataset=test_set, batch_size=TEST_SIZE//10, shuffle=False)

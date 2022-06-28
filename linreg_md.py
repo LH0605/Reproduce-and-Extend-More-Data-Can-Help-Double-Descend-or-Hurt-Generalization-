@@ -16,10 +16,14 @@ low, high = -1., 1.
 
 
 def train_loss(output, target):
+    # print('output: ', output, output.size())
+    # print('target: ', target, target.size())
     return nn.MSELoss(reduction="sum")(output, target)
 
 def test_loss(weight, w_star):
-    return nn.MSELoss()(weight, w_star)
+    # print('weight: ', weight, weight.size())
+    # print('w_star: ', w_star, w_star.size())
+    return nn.MSELoss(reduction="sum")(weight, w_star)
 
 def fgsm(model, x, y, epsilon):
     """ Construct FGSM adversarial examples on the examples X"""
@@ -49,17 +53,17 @@ def fit(num_epochs, train_loader, test_loader, model, opt, train_size, epsilon, 
             opt.step()
             sum_loss += float(loss)
         epoch_train_loss = sum_loss / train_size
-        # print('BEST_MODEL_PATH: ', BEST_MODEL_PATH)
         if epoch_train_loss < best_loss:
             best_loss = epoch_train_loss
             torch.save(model.state_dict(), BEST_MODEL_PATH)
         # print('best w: ', weight)
-        # print("Epoch:", epoch)
-        # print("Training loss:", epoch_train_loss)
+        print("Epoch:", epoch)
+        print("Training loss:", epoch_train_loss)
 
     # calc test loss
     sum_test_loss = 0
-    model = nn.Linear(1, 1, bias=False)
+    model = nn.Linear(2, 1, bias=False)
+    # print("BEST_MODEL_PATH: ", BEST_MODEL_PATH)
     model.load_state_dict(torch.load(BEST_MODEL_PATH))
     model.eval()
     weight = model.weight
@@ -77,11 +81,11 @@ def main():
     global num_epochs
     if args.gaussian:
         epsilons = [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0, 2.5, 3.0]
-        BEST_MODEL_PATH = 'best_lrg_model_gaussian.pt'
+        BEST_MODEL_PATH = 'best_lrg_md_model_gaussian.pt'
         num_epochs = 100
     else:
         epsilons = [0, 1., 2., 3., 4., 5., 6., 8., 10., 12.]
-        BEST_MODEL_PATH = 'best_lrg_model_poisson.pt'
+        BEST_MODEL_PATH = 'best_lrg_md_model_poisson.pt'
         num_epochs = 30
     test_losses = np.zeros((len(epsilons), TRAIN_SIZE))
     for i in range(len(epsilons)):
@@ -90,24 +94,26 @@ def main():
             N = 100
             temp = np.zeros(N)
             for j in range(N):
-                model = nn.Linear(1, 1, bias=False)
+                model = nn.Linear(2, 1, bias=False)
                 opt = Adam(model.parameters(), lr=learning_rate)
                 batch_size = min(5, train_size)
                 
-                w_star = low + torch.rand(1) * (high - low)
-                print('w_star: ', w_star)
+                w_star = low + torch.rand(2) * (high - low)
+                # print('w_star: ', w_star)
                 
-                e_train = torch.randn(train_size, 2)
+                e_train = torch.randn(train_size, 1)
+                e_test = torch.randn(TEST_SIZE, 1)
                 if args.gaussian:
                     x_train = torch.randn(train_size, 2)
+                    x_test = torch.randn(TEST_SIZE, 2)
                 else:
-                    x_train = torch.unsqueeze(torch.distributions.poisson.Poisson(5).sample((train_size, 2)) + 1, dim=1).float()
-                y_train = w_star * x_train + e_train
+                    x_train = (torch.distributions.poisson.Poisson(5).sample((train_size, 2)) + 1).float()
+                    x_test = (torch.distributions.poisson.Poisson(5).sample((TEST_SIZE, 2)) + 1).float()
+                    
+                y_train = torch.unsqueeze(x_train @ w_star, dim=1) + e_train
                 train_set = Data.TensorDataset(x_train, y_train)
                 train_loader = Data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
                 
-                e_test = torch.randn(TEST_SIZE, 2)
-                x_test = torch.randn(TEST_SIZE, 2)
                 y_test = w_star * x_test + e_test
                 test_set = Data.TensorDataset(x_test, y_test)
                 test_loader = Data.DataLoader(dataset=test_set, batch_size=TEST_SIZE//10, shuffle=False)
@@ -129,7 +135,7 @@ def main():
         epsilon = epsilons[1+i]
         plt.plot(train_sizes, test_losses[1+i], label=f"Ɛ = {epsilon}")
     plt.legend(loc="best")
-    plt.savefig(f"lrg_{title_model.lower()}_weak.png")
+    plt.savefig(f"lrg_md_{title_model.lower()}_weak.png")
     plt.clf()
     
     plt.title(f"Linear Regression 2D {title_model} (medium)")
@@ -140,7 +146,7 @@ def main():
         epsilon = epsilons[1+step+i]
         plt.plot(train_sizes, test_losses[1+step+i], label=f"Ɛ = {epsilon}")
     plt.legend(loc="best")
-    plt.savefig(f"lrg_{title_model.lower()}_medium.png")
+    plt.savefig(f"lrg_md_{title_model.lower()}_medium.png")
     plt.clf()
     
     plt.title(f"Linear Regression 2D {title_model} (strong)")
@@ -151,7 +157,7 @@ def main():
         epsilon = epsilons[1+(2*step)+i]
         plt.plot(train_sizes, test_losses[1+(2*step)+i], label=f"Ɛ = {epsilon}")
     plt.legend(loc="best")
-    plt.savefig(f"lrg_{title_model.lower()}_strong.png")
+    plt.savefig(f"lrg_md_{title_model.lower()}_strong.png")
 
 if __name__ == "__main__":
     main()

@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 mu = 0
 sigma = 1
 learning_rate = 1e-1
-weight_decay = 1e-3
+# num_epochs = 100
 TEST_SIZE = 1000 # TODO: change to 5k!
 TRAIN_SIZE = 30
-low, high = 0., 2.
+low, high = -1., 1.
 
 
 def train_loss(output, target):
@@ -49,13 +49,13 @@ def fit(num_epochs, train_loader, test_loader, model, opt, train_size, epsilon, 
             opt.step()
             sum_loss += float(loss)
         epoch_train_loss = sum_loss / train_size
-        print('BEST_MODEL_PATH: ', BEST_MODEL_PATH)
+        # print('BEST_MODEL_PATH: ', BEST_MODEL_PATH)
         if epoch_train_loss < best_loss:
             best_loss = epoch_train_loss
-        torch.save(model.state_dict(), BEST_MODEL_PATH)
-        print('best w: ', weight)
-        print("Epoch:", epoch)
-        print("Training loss:", epoch_train_loss)
+            torch.save(model.state_dict(), BEST_MODEL_PATH)
+        # print('best w: ', weight)
+        # print("Epoch:", epoch)
+        # print("Training loss:", epoch_train_loss)
 
     # calc test loss
     sum_test_loss = 0
@@ -71,7 +71,6 @@ def fit(num_epochs, train_loader, test_loader, model, opt, train_size, epsilon, 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--gaussian', action='store_true')
-    parser.add_argument('--l2', action='store_true')
     args = parser.parse_args()
     print('args: ', args)
     global BEST_MODEL_PATH
@@ -92,26 +91,23 @@ def main():
             temp = np.zeros(N)
             for j in range(N):
                 model = nn.Linear(1, 1, bias=False)
-                if args.l2:
-                    opt = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-                else:
-                    opt = Adam(model.parameters(), lr=learning_rate)
+                opt = Adam(model.parameters(), lr=learning_rate)
                 batch_size = min(5, train_size)
                 
                 w_star = low + torch.rand(1) * (high - low)
                 print('w_star: ', w_star)
                 
-                e_train = torch.randn(train_size, 1)
+                e_train = torch.randn(train_size, 2)
                 if args.gaussian:
-                    x_train = torch.randn(train_size, 1)
+                    x_train = torch.randn(train_size, 2)
                 else:
-                    x_train = torch.unsqueeze(torch.distributions.poisson.Poisson(5).sample((train_size,)) + 1, dim=1).float()
+                    x_train = torch.unsqueeze(torch.distributions.poisson.Poisson(5).sample((train_size, 2)) + 1, dim=1).float()
                 y_train = w_star * x_train + e_train
                 train_set = Data.TensorDataset(x_train, y_train)
                 train_loader = Data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
                 
-                e_test = torch.randn(TEST_SIZE, 1)
-                x_test = torch.randn(TEST_SIZE, 1)
+                e_test = torch.randn(TEST_SIZE, 2)
+                x_test = torch.randn(TEST_SIZE, 2)
                 y_test = w_star * x_test + e_test
                 test_set = Data.TensorDataset(x_test, y_test)
                 test_loader = Data.DataLoader(dataset=test_set, batch_size=TEST_SIZE//10, shuffle=False)
@@ -125,7 +121,7 @@ def main():
     step = 3
     train_sizes = np.arange(1, TRAIN_SIZE+1)
     title_model = "Gaussian" if args.gaussian else "Poisson"
-    plt.title(f"Linear Regression {title_model} (weak)")
+    plt.title(f"Linear Regression 2D {title_model} (weak)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
     plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
@@ -136,7 +132,7 @@ def main():
     plt.savefig(f"lrg_{title_model.lower()}_weak.png")
     plt.clf()
     
-    plt.title(f"Linear Regression {title_model} (medium)")
+    plt.title(f"Linear Regression 2D {title_model} (medium)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
     plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
@@ -147,7 +143,7 @@ def main():
     plt.savefig(f"lrg_{title_model.lower()}_medium.png")
     plt.clf()
     
-    plt.title(f"Linear Regression {title_model} (strong)")
+    plt.title(f"Linear Regression 2D {title_model} (strong)")
     plt.xlabel("Size of Training Dataset")
     plt.ylabel("Test Loss")
     plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")

@@ -9,10 +9,11 @@ import matplotlib.pyplot as plt
 mu = 1
 sigma = 2
 learning_rate = 1e-1
-num_epochs = 100
-W = 1.3
-N = 100
-TEST_SIZE = 500
+num_epochs = 1000
+num_features = 1
+W = 2.
+N = 500
+TEST_SIZE = 100
 TRAIN_SIZE = 30
 BEST_MODEL_PATH = 'best_gaussian_mixture_linear_loss_model.pt'
 
@@ -24,8 +25,15 @@ class WeightClipper(object):
             module.weight.data = w.clamp(-W, W)
 clipper = WeightClipper()
 
-x_test = torch.unsqueeze(torch.cat([torch.distributions.Normal(-mu, sigma).sample((TEST_SIZE,)), torch.distributions.Normal(mu, sigma).sample((TEST_SIZE,))]), dim=1).float()
-y_test = torch.unsqueeze(torch.cat([-torch.ones(TEST_SIZE), torch.ones(TEST_SIZE)]), dim=1).float()
+# x_test = torch.unsqueeze(torch.cat([torch.distributions.Normal(-mu, sigma).sample((TEST_SIZE,)), torch.distributions.Normal(mu, sigma).sample((TEST_SIZE,))]), dim=1).float()
+# y_test = torch.unsqueeze(torch.cat([-torch.ones(TEST_SIZE), torch.ones(TEST_SIZE)]), dim=1).float()
+
+x_test, y_test = datasets.make_blobs(n_samples=TEST_SIZE, n_features=num_features,
+    centers=[np.full((num_features),-1) ,np.full((num_features),1)],cluster_std=sigma)
+x_test = torch.FloatTensor(x_test)
+y_test = torch.FloatTensor(y_test)
+y_test[y_test==0] = -1
+
 test_set = Data.TensorDataset(x_test, y_test)
 test_loader = Data.DataLoader(dataset=test_set, batch_size=TEST_SIZE//10, shuffle=False)
 
@@ -69,7 +77,7 @@ def fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon):
         y_pred = model(x)
         loss = loss_fn(y_pred, y)
         sum_test_loss += loss
-    temp = sum_test_loss / TEST_SIZE
+    temp = sum_test_loss
     return temp
 
 def main():
@@ -87,17 +95,16 @@ def main():
             for j in range(N):
                 model = nn.Linear(1, 1, bias=False)
                 opt = Adam(model.parameters(), lr=learning_rate)
-                batch_size = min(5, train_size)
+                # batch_size = min(5, train_size)
                 # x_train = torch.unsqueeze(torch.cat([torch.distributions.Normal(-mu, sigma).sample((train_size,)), torch.distributions.Normal(mu, sigma).sample((train_size,))]), dim=1).float()
                 # y_train = torch.unsqueeze(torch.cat([-torch.ones(train_size), torch.ones(train_size)]), dim=1).float()
-                num_features = 1
                 x_train, y_train = datasets.make_blobs(n_samples=train_size, n_features=num_features,
                             centers=[np.full((num_features),-1) ,np.full((num_features),1)],cluster_std=sigma)
                 x_train = torch.FloatTensor(x_train)
                 y_train = torch.FloatTensor(y_train)
                 y_train[y_train==0] = -1
                 train_set = Data.TensorDataset(x_train, y_train)
-                train_loader = Data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
+                train_loader = Data.DataLoader(dataset=train_set, batch_size=train_size, shuffle=True)
                 test_loss = fit(num_epochs, train_loader, model, loss_fn, opt, train_size, epsilon)
                 temp[j] = test_loss.item()
             mean = np.mean(temp)

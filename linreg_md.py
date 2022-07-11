@@ -1,3 +1,4 @@
+from time import process_time
 import argparse
 import numpy as np
 import torch
@@ -8,45 +9,47 @@ import matplotlib.pyplot as plt
 
 mu = 0
 sigma = 1
-learning_rate = 1e-2
+learning_rate = 1e-1
 N = 300
 TEST_SIZE = 100
-TRAIN_SIZE = 25
-low, high = -1., 1.
+TRAIN_SIZE = 50
 
 
-def train_loss(output, target):
-    return nn.MSELoss(reduction="sum")(output, target)
+def train_loss(model, x, y, epsilon):
+    # return nn.MSELoss(reduction="sum")(output, target)
+    return torch.pow(torch.abs(y-model(x.float())), 2)
 
-def test_loss(weight, w_star):
-    return nn.MSELoss(reduction="sum")(weight.squeeze(), w_star)
+def test_loss(weight):
+    return torch.pow(torch.abs(weight-1.0), 2).sum()
 
 def fgsm(model, x, y, epsilon):
     """ Construct FGSM adversarial examples on the examples X"""
     x.requires_grad = True
-    output = model(x.cuda())
-    loss = train_loss(output, y)
+    output = model(x)
+    loss = train_loss(model, x, output, epsilon)
     model.zero_grad()
     loss.backward()
     return epsilon * x.grad.data.sign()
 
-def fit(num_epochs, train_loader, test_loader, model, opt, attack, train_size, epsilon, w_star):
+def fit(num_epochs, train_loader, test_loader, model, opt, attack, train_size, epsilon):
     model.train()
     best_loss = float('inf')
+    count = 0
     for epoch in range(num_epochs):
         sum_loss = 0
         for x, y in train_loader:
             opt.zero_grad()
-            if attack == "fgsm":
-                delta = fgsm(model, x, y, epsilon).to(device)
+            if attack == "opt":
+                loss = torch.pow(torch.abs(y-model(x.float())) + epsilon * torch.norm(model.weight, 1), 2).sum()
+            elif attack == "fgsm":
+                delta = fgsm(model, x, y, epsilon)
                 # perturbed training data
                 x_pert = x + delta
                 # predicted output
-                y_pred = model(x_pert.cuda())
+                y_pred = model(x_pert)
+                loss = train_loss(model, x, y_pred, epsilon)
             elif attack == "pgd":
                 pass
-            weight = model.weight
-            loss = train_loss(y_pred, y)
             loss.backward()
             opt.step()
             sum_loss += float(loss)
@@ -54,15 +57,20 @@ def fit(num_epochs, train_loader, test_loader, model, opt, attack, train_size, e
         if epoch_train_loss < best_loss:
             best_loss = epoch_train_loss
             torch.save(model.state_dict(), BEST_MODEL_PATH)
+            count = 0
+        else:
+            count += 1
+        if count == 30: # early stopping
+            break
 
     # calc test loss
     sum_test_loss = 0
-    model = nn.Linear(num_dim, 1, bias=False).to(device)
+    model = nn.Linear(num_dim, 1, bias=False)
     model.load_state_dict(torch.load(BEST_MODEL_PATH, map_location="cpu"))
     model.eval()
     weight = model.weight
     for x, y in test_loader:
-        loss = test_loss(weight, w_star)
+        loss = test_loss(weight)
         sum_test_loss += loss
     return sum_test_loss / TEST_SIZE
 
@@ -70,59 +78,58 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--gaussian', action='store_true')
     parser.add_argument('--ndim', default=1, type=int)
-    parser.add_argument('--attack', default='fgsm', type=str)
+    parser.add_argument('--attack', default='fgsm', type=str, choices=['opt', 'fgsm', 'pgd'])
     parser.add_argument('--l2', default=0, type=float)
     args = parser.parse_args()
     print('args: ', args)
-    global BEST_MODEL_PATH, num_epochs, num_dim, device
+    global BEST_MODEL_PATH, num_epochs, num_dim
     num_dim = args.ndim
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    e_test = torch.randn(TEST_SIZE).to(device)
-    w_star = (low + torch.rand(num_dim) * (high - low)).to(device)
+    e_test = torch.randn(TEST_SIZE)
     if args.gaussian:
         epsilons = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.5, 2.0, 2.5, 3.0]
-        BEST_MODEL_PATH = f'best_linreg_{num_dim}d_{args.attack}_{args.l2}_model_gaussian.pt'
+        BEST_MODEL_PATH = f'best_lreg_{num_dim}d_{args.attack}_{round(args.l2, 2)}_model_gaussian.pt'
         num_epochs = 300
-        x_test = torch.randn(TEST_SIZE, num_dim).to(device)
+        x_test = torch.randn(TEST_SIZE, num_dim)
     else:
         epsilons = [0, 1., 2., 3., 4., 5., 6., 8., 10., 12.]
-        BEST_MODEL_PATH = f'best_linreg_{num_dim}d_{args.attack}_{args.l2}_model_poisson.pt'
+        BEST_MODEL_PATH = f'best_lreg_{num_dim}d_{args.attack}_{round(args.l2, 2)}_model_poisson.pt'
         num_epochs = 100
-        x_test = (torch.distributions.poisson.Poisson(5).sample((TEST_SIZE, num_dim)) + 1).float().to(device)
-    y_test = torch.unsqueeze(x_test @ w_star, dim=1) + e_test
-    
-    y_test.to(device)
+        x_test = (torch.distributions.poisson.Poisson(5).sample((TEST_SIZE, num_dim)) + 1).float()
+    y_test = torch.unsqueeze(x_test.sum(1) + e_test, dim=1)
     test_set = Data.TensorDataset(x_test, y_test)
     test_loader = Data.DataLoader(dataset=test_set, batch_size=TEST_SIZE, shuffle=False)
 
     test_losses = np.zeros((len(epsilons), TRAIN_SIZE))
     vars = np.zeros((len(epsilons), TRAIN_SIZE))
+    tic = process_time()
     for i in range(len(epsilons)):
         epsilon = epsilons[i]
         for train_size in range(1, TRAIN_SIZE+1):
             temp = np.zeros(N)
             for j in range(N):
-                model = nn.Linear(num_dim, 1, bias=False).to(device)
+                model = nn.Linear(num_dim, 1, bias=False)
                 if args.l2:
-                    opt = SGD(model.parameters(), lr=learning_rate, weight_decay=args.l2)
+                    opt = Adam(model.parameters(), lr=learning_rate, weight_decay=args.l2)
                 else:
-                    opt = SGD(model.parameters(), lr=learning_rate)
-                e_train = torch.randn(train_size, 1).to(device)
+                    opt = Adam(model.parameters(), lr=learning_rate)
+                e_train = torch.randn(train_size)
                 if args.gaussian:
-                    x_train = torch.randn(train_size, num_dim).to(device)
+                    x_train = torch.randn(train_size, num_dim)
                 else:
-                    x_train = (torch.distributions.poisson.Poisson(5).sample((train_size, num_dim)) + 1).float().to(device)
+                    x_train = (torch.distributions.poisson.Poisson(5).sample((train_size, num_dim)) + 1).float()
 
-                y_train = torch.unsqueeze(x_train @ w_star, dim=1) + e_train
+                y_train = torch.unsqueeze(x_train.sum(1) + e_train, dim=1)
                 train_set = Data.TensorDataset(x_train, y_train)
                 train_loader = Data.DataLoader(dataset=train_set, batch_size=train_size, shuffle=True)
                 
-                test_loss = fit(num_epochs, train_loader, test_loader, model, opt, args.attack, train_size, epsilon, w_star)
+                test_loss = fit(num_epochs, train_loader, test_loader, model, opt, args.attack, train_size, epsilon)
                 temp[j] = test_loss.item()
             mean = np.mean(temp)
-            test_losses[i, train_size-1] = mean.item()
+            test_losses[i, train_size-1] = mean
             var = np.var(temp, dtype=np.float64)
             vars[i, train_size-1] = var
+    toc = process_time()
+    print("elapsed time:", toc-tic)
     print("test_losses:", test_losses)
     print("variance:", vars)
 

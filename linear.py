@@ -37,6 +37,17 @@ def fgsm(model, x, y, epsilon):
     loss.backward()
     return epsilon * x.grad.data.sign()
 
+def fgm(model, x, y, epsilon):
+    """ Construct FGSM adversarial examples on the examples X"""
+    x.requires_grad = True
+    output = model(x)
+    loss = linear_loss(output, y)
+    model.zero_grad()
+    loss.backward()
+    grad = x.grad.data
+    norm_x = torch.norm(grad, 2)
+    return epsilon * grad/norm_x
+
 def fit(num_epochs, train_loader, test_loader, model, opt, attack, train_size, epsilon):
     model.train()
     best_loss = float('inf')
@@ -49,6 +60,9 @@ def fit(num_epochs, train_loader, test_loader, model, opt, attack, train_size, e
                 y_pred = model(x.view(x.shape[0], -1))[:,0] - y*epsilon*model.weight.norm(1)
             elif attack == "fgsm":
                 delta = fgsm(model, x, y, epsilon)
+                y_pred = model(x + delta)
+            elif attack == "fgm":
+                delta = fgm(model, x, y, epsilon)
                 y_pred = model(x + delta)
             elif attack == "pgd":
                 pass
@@ -80,7 +94,7 @@ def fit(num_epochs, train_loader, test_loader, model, opt, attack, train_size, e
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ndim', type=int)
-    parser.add_argument('--attack', default="fgsm", type=str)
+    parser.add_argument('--attack', default="fgsm", type=str, choices=['opt', 'fgsm', 'fgm', 'pgd'])
     args = parser.parse_args()
     print('args: ', args)
     global num_dim, BEST_MODEL_PATH

@@ -12,24 +12,68 @@ sigma = 1
 learning_rate = 1e-1
 N = 300
 TEST_SIZE = 100
-TRAIN_SIZE = 50
+TRAIN_SIZE = 30
 
 
-def train_loss(model, x, y, epsilon):
+def train_loss(output, target):
     # return nn.MSELoss(reduction="sum")(output, target)
-    return torch.pow(torch.abs(y-model(x.float())), 2)
+    return torch.pow(torch.abs(target-output), 2).sum()
 
 def test_loss(weight):
     return torch.pow(torch.abs(weight-1.0), 2).sum()
 
 def fgsm(model, x, y, epsilon):
-    """ Construct FGSM adversarial examples on the examples X"""
+    """ Construct FGSM adversarial examples on the examples X with L_infinity norm"""
     x.requires_grad = True
     output = model(x)
-    loss = train_loss(model, x, output, epsilon)
+    loss = train_loss(output, y)
     model.zero_grad()
     loss.backward()
     return epsilon * x.grad.data.sign()
+
+def fgm(model, x, y, epsilon):
+    """ Construct FGSM adversarial examples on the examples X with L_2 norm"""
+    x.requires_grad = True
+    output = model(x)
+    loss = train_loss(output, y)
+    model.zero_grad()
+    loss.backward()
+    grad = x.grad.data
+    norm_x = torch.norm(grad, 2)
+    return epsilon * grad/norm_x
+
+# def pgd(model, x, y, eps):
+#     alpha = 1
+#     iters = 30
+#     adv_x = x.clone()
+#     print('x', x)
+#     for iter in range(iters):
+#         adv_x.requires_grad = True
+#         output = model(adv_x)
+#         model.zero_grad()
+#         loss = train_loss(output, y)
+#         loss.backward()
+#         adv_x = adv_x.detach() + alpha * x.grad.data.sign()
+#         delta = torch.clamp(adv_x - x, min=-eps, max=eps)
+#         adv_x = x + delta
+#         print('adv x', adv_x)
+#     return adv_x
+
+def pgd(model, x, y, epsilon):
+    alpha = epsilon / 5.
+    num_iter = 30
+    # print('x', x)
+    print('x.shape[0]',  x.shape[0])
+    delta = torch.zeros_like(x, requires_grad=True)
+    for _ in range(num_iter):
+        output = model(x + delta)
+        loss = train_loss(output, y)
+        loss.backward()
+        delta.data = (delta + x.shape[0]*alpha*delta.grad.data).clamp(-epsilon,epsilon)
+        delta.grad.zero_()
+        if delta.sum().item() > 0:
+            print('delta', delta)
+    return delta.detach()
 
 def fit(num_epochs, train_loader, test_loader, model, opt, attack, train_size, epsilon):
     model.train()
@@ -43,13 +87,16 @@ def fit(num_epochs, train_loader, test_loader, model, opt, attack, train_size, e
                 loss = torch.pow(torch.abs(y-model(x.float())) + epsilon * torch.norm(model.weight, 1), 2).sum()
             elif attack == "fgsm":
                 delta = fgsm(model, x, y, epsilon)
-                # perturbed training data
-                x_pert = x + delta
-                # predicted output
-                y_pred = model(x_pert)
-                loss = train_loss(model, x, y_pred, epsilon)
+                y_pred = model(x + delta)
+                loss = train_loss(y_pred, y)
+            elif attack == "fgm":
+                delta = fgm(model, x, y, epsilon)
+                y_pred = model(x + delta)
+                loss = train_loss(y_pred, y)
             elif attack == "pgd":
-                pass
+                x_pert = pgd(model, x, y, epsilon)
+                y_pred = model(x_pert)
+                loss = train_loss(y_pred, y)
             loss.backward()
             opt.step()
             sum_loss += float(loss)
@@ -78,7 +125,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--gaussian', action='store_true')
     parser.add_argument('--ndim', default=1, type=int)
-    parser.add_argument('--attack', default='fgsm', type=str, choices=['opt', 'fgsm', 'pgd'])
+    parser.add_argument('--attack', default='fgsm', type=str, choices=['opt', 'fgsm', 'fgm', 'pgd'])
     parser.add_argument('--l2', default=0, type=float)
     args = parser.parse_args()
     print('args: ', args)
@@ -91,7 +138,7 @@ def main():
         num_epochs = 300
         x_test = torch.randn(TEST_SIZE, num_dim)
     else:
-        epsilons = [0, 1., 2., 3., 4., 5., 6., 8., 10., 12.]
+        epsilons = [0, 1., 3., 4., 7., 8., 10., 12.]
         BEST_MODEL_PATH = f'best_lreg_{num_dim}d_{args.attack}_{round(args.l2, 2)}_model_poisson.pt'
         num_epochs = 100
         x_test = (torch.distributions.poisson.Poisson(5).sample((TEST_SIZE, num_dim)) + 1).float()

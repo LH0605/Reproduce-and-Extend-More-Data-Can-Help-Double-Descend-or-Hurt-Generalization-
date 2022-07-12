@@ -62,8 +62,6 @@ def fgm(model, x, y, epsilon):
 def pgd(model, x, y, epsilon):
     alpha = epsilon / 5.
     num_iter = 30
-    # print('x', x)
-    print('x.shape[0]',  x.shape[0])
     delta = torch.zeros_like(x, requires_grad=True)
     for _ in range(num_iter):
         output = model(x + delta)
@@ -71,8 +69,6 @@ def pgd(model, x, y, epsilon):
         loss.backward()
         delta.data = (delta + x.shape[0]*alpha*delta.grad.data).clamp(-epsilon,epsilon)
         delta.grad.zero_()
-        if delta.sum().item() > 0:
-            print('delta', delta)
     return delta.detach()
 
 def fit(num_epochs, train_loader, test_loader, model, opt, attack, train_size, epsilon):

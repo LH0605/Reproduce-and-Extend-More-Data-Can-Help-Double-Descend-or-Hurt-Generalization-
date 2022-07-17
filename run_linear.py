@@ -3,7 +3,7 @@ from subprocess import Popen, PIPE
 
 def run_linear(dim):
     print(f'dim: {dim}')
-    attack = "fgm"
+    attack = "pgd"
     cmd = f"nice -n 10 python3 linear.py --attack {attack} --ndim {dim} > linear_{attack}_{dim}d.log"
     proc = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
     res = proc.communicate()

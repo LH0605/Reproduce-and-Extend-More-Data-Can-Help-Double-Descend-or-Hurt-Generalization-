@@ -4,11 +4,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.utils.data as Data
-from torch.optim import SGD, Adam
-import matplotlib.pyplot as plt
+from torch.optim import Adam
 
-mu = 0
-sigma = 1
 learning_rate = 1e-1
 N = 300
 TEST_SIZE = 100
@@ -16,7 +13,6 @@ TRAIN_SIZE = 30
 
 
 def train_loss(output, target):
-    # return nn.MSELoss(reduction="sum")(output, target)
     return torch.pow(torch.abs(target-output), 2).sum()
 
 def test_loss(weight):
@@ -42,34 +38,22 @@ def fgm(model, x, y, epsilon):
     norm_x = torch.norm(grad, 2)
     return epsilon * grad/norm_x
 
-# def pgd(model, x, y, eps):
-#     alpha = 1
-#     iters = 30
-#     adv_x = x.clone()
-#     print('x', x)
-#     for iter in range(iters):
-#         adv_x.requires_grad = True
-#         output = model(adv_x)
-#         model.zero_grad()
-#         loss = train_loss(output, y)
-#         loss.backward()
-#         adv_x = adv_x.detach() + alpha * x.grad.data.sign()
-#         delta = torch.clamp(adv_x - x, min=-eps, max=eps)
-#         adv_x = x + delta
-#         print('adv x', adv_x)
-#     return adv_x
-
 def pgd(model, x, y, epsilon):
-    alpha = epsilon / 5.
+    alpha = epsilon / 3.
     num_iter = 30
-    delta = torch.zeros_like(x, requires_grad=True)
+    delta = torch.zeros_like(x)
+    adv_x = x.clone().detach()
     for _ in range(num_iter):
-        output = model(x + delta)
+        adv_x.requires_grad = True
+        output = model(adv_x)
+        model.zero_grad()
         loss = train_loss(output, y)
         loss.backward()
-        delta.data = (delta + x.shape[0]*alpha*delta.grad.data).clamp(-epsilon,epsilon)
-        delta.grad.zero_()
-    return delta.detach()
+        grad = adv_x.grad.data
+        adv_x = adv_x.detach() + alpha * grad.sign()
+        delta = torch.clamp(adv_x - x, min=-epsilon, max=epsilon)
+        adv_x = x + delta
+    return delta
 
 def fit(num_epochs, train_loader, test_loader, model, opt, attack, train_size, epsilon):
     model.train()
@@ -90,8 +74,8 @@ def fit(num_epochs, train_loader, test_loader, model, opt, attack, train_size, e
                 y_pred = model(x + delta)
                 loss = train_loss(y_pred, y)
             elif attack == "pgd":
-                x_pert = pgd(model, x, y, epsilon)
-                y_pred = model(x_pert)
+                delta = pgd(model, x, y, epsilon)
+                y_pred = model(x + delta)
                 loss = train_loss(y_pred, y)
             loss.backward()
             opt.step()
@@ -143,7 +127,8 @@ def main():
     test_loader = Data.DataLoader(dataset=test_set, batch_size=TEST_SIZE, shuffle=False)
 
     test_losses = np.zeros((len(epsilons), TRAIN_SIZE))
-    vars = np.zeros((len(epsilons), TRAIN_SIZE))
+    mins = np.zeros((len(epsilons), TRAIN_SIZE))
+    maxs = np.zeros((len(epsilons), TRAIN_SIZE))
     tic = process_time()
     for i in range(len(epsilons)):
         epsilon = epsilons[i]
@@ -167,49 +152,17 @@ def main():
                 
                 test_loss = fit(num_epochs, train_loader, test_loader, model, opt, args.attack, train_size, epsilon)
                 temp[j] = test_loss.item()
+            mn = np.amin(temp)
+            mx = np.amax(temp)
+            mins[i, train_size-1] = mn
+            maxs[i, train_size-1] = mx
             mean = np.mean(temp)
             test_losses[i, train_size-1] = mean
-            var = np.var(temp, dtype=np.float64)
-            vars[i, train_size-1] = var
     toc = process_time()
-    print("elapsed time:", toc-tic)
+    print("elapsed time:", toc - tic)
+    print("mins:", mins)
+    print("maxs:", maxs)
     print("test_losses:", test_losses)
-    print("variance:", vars)
-
-    # step = 3
-    # train_sizes = np.arange(1, TRAIN_SIZE+1)
-    # title_model = "Gaussian" if args.gaussian else "Poisson"
-    # plt.title(f"Linear Regression 2D {title_model} (weak)")
-    # plt.xlabel("Size of Training Dataset")
-    # plt.ylabel("Test Loss")
-    # plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
-    # for i in range(len(epsilons[1:1+step])):
-    #     epsilon = epsilons[1+i]
-    #     plt.plot(train_sizes, test_losses[1+i], label=f"Ɛ = {epsilon}")
-    # plt.legend(loc="best")
-    # plt.savefig(f"lrg_{num_dim}d_{title_model.lower()}_weak.png")
-    # plt.clf()
-    
-    # plt.title(f"Linear Regression 2D {title_model} (medium)")
-    # plt.xlabel("Size of Training Dataset")
-    # plt.ylabel("Test Loss")
-    # plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
-    # for i in range(len(epsilons[1+step:1+(2*step)])):
-    #     epsilon = epsilons[1+step+i]
-    #     plt.plot(train_sizes, test_losses[1+step+i], label=f"Ɛ = {epsilon}")
-    # plt.legend(loc="best")
-    # plt.savefig(f"lrg_{num_dim}d_{title_model.lower()}_medium.png")
-    # plt.clf()
-    
-    # plt.title(f"Linear Regression 2D {title_model} (strong)")
-    # plt.xlabel("Size of Training Dataset")
-    # plt.ylabel("Test Loss")
-    # plt.plot(train_sizes, test_losses[0], 'r--', label=f"Ɛ = 0")
-    # for i in range(len(epsilons[1+(2*step):])):
-    #     epsilon = epsilons[1+(2*step)+i]
-    #     plt.plot(train_sizes, test_losses[1+(2*step)+i], label=f"Ɛ = {epsilon}")
-    # plt.legend(loc="best")
-    # plt.savefig(f"lrg_{num_dim}d_{title_model.lower()}_strong.png")
 
 if __name__ == "__main__":
     main()

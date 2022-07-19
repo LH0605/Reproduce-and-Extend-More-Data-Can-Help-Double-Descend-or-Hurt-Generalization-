@@ -44,8 +44,14 @@ def fgm(model, x, y, epsilon):
     model.zero_grad()
     loss.backward()
     grad = x.grad.data
-    norm_x = torch.norm(grad, 2)
-    return epsilon * grad/norm_x
+    norm = torch.norm(grad, p=2)
+    if norm:
+        # print('compare: ', x.grad.data.sign(), grad/norm)
+        return epsilon * grad/norm
+    else: # TODO: delete
+        print('grad', grad)
+        print('egn', epsilon * grad/norm)
+        raise Exception("norm = 0")
 
 def pgd(model, x, y, epsilon):
     alpha = epsilon / 3.

@@ -16,7 +16,7 @@ def run_linreg_dim(dim):
 
 def run_linreg_l2(l2):
     dim = 1
-    attack = "opt"
+    attack = "fgsm"
     type = "gaussian"
     
     print(f'l2: {l2}')
@@ -32,9 +32,9 @@ def run_linreg_l2(l2):
         print("stderr =", res[1])
 
 if __name__ == "__main__":
-    dims = [1, 2, 5, 7, 10]
-    # l2s = [1, 0.1, 0.01, 0.001]
+    # dims = [1, 2, 5, 7, 10]
+    l2s = [1, 0.1, 0.01, 0.05, 0.5, 5]
     with Pool(5) as pool:
-        pool.map(run_linreg_dim, dims)
-        # pool.map(run_linreg_l2, l2s)
+        # pool.map(run_linreg_dim, dims)
+        pool.map(run_linreg_l2, l2s)
     print("Finished!")

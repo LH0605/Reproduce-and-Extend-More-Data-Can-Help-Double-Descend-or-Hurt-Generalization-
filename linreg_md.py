@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.utils.data as Data
-from torch.optim import Adam
+from torch.optim import SGD
 
 learning_rate = 1e-1
 N = 300
@@ -137,9 +137,9 @@ def main():
             for j in range(N):
                 model = nn.Linear(num_dim, 1, bias=False)
                 if args.l2:
-                    opt = Adam(model.parameters(), lr=learning_rate, weight_decay=args.l2)
+                    opt = SGD(model.parameters(), lr=learning_rate, weight_decay=args.l2)
                 else:
-                    opt = Adam(model.parameters(), lr=learning_rate)
+                    opt = SGD(model.parameters(), lr=learning_rate, weight_decay=args.l2)
                 e_train = torch.randn(train_size)
                 if args.gaussian:
                     x_train = torch.randn(train_size, num_dim)

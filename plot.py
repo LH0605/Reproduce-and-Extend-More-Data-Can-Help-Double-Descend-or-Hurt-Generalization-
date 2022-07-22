@@ -127,8 +127,6 @@ test_losses = [[-0.32072777,-0.56639159,-0.60051157,-0.70969549,-0.76428745,-0.8
 ,-0.99907087,-0.99820658,-1.00703492,-0.99965352,-1.00204803,-1.01325425
 ,-1.01093754,-1.00024826,-1.01425302,-1.01058368]]
 
-
-
 if len(epsilons) != len(test_losses):
     print(len(epsilons), len(test_losses))
     raise Exception("should be the same, check epsilons")

@@ -5,7 +5,7 @@ from sklearn import datasets
 import torch
 import torch.nn as nn
 import torch.utils.data as Data
-from torch.optim import Adam
+from torch.optim import SGD
 
 mu = 1
 sigma = 2
@@ -44,14 +44,8 @@ def fgm(model, x, y, epsilon):
     model.zero_grad()
     loss.backward()
     grad = x.grad.data
-    norm = torch.norm(grad, p=2)
-    if norm:
-        # print('compare: ', x.grad.data.sign(), grad/norm)
-        return epsilon * grad/norm
-    else: # TODO: delete
-        print('grad', grad)
-        print('egn', epsilon * grad/norm)
-        raise Exception("norm = 0")
+    norm = grad.norm(dim=1, p=2)[:, None]
+    return epsilon * grad/norm
 
 def pgd(model, x, y, epsilon):
     alpha = epsilon / 3.
@@ -118,11 +112,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ndim', type=int)
     parser.add_argument('--attack', default="fgsm", type=str, choices=['opt', 'fgsm', 'fgm', 'pgd'])
+    parser.add_argument('--l2', default=0, type=float)
     args = parser.parse_args()
     print('args: ', args)
     global num_dim, BEST_MODEL_PATH
     num_dim = args.ndim
-    BEST_MODEL_PATH = f'linear_{args.attack}_{num_dim}D.pt'
+    BEST_MODEL_PATH = f'lin_{args.attack}_{num_dim}D_{int(args.l2*100)}_model.pt'
+    print(BEST_MODEL_PATH)
     epsilons = [0, 0.1, 0.3, 0.5, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.3, 1.5, 1.7, 2.0]
     # epsilons = [0, 0.3, 0.5, 0.7, 1.1, 1.3, 1.5, 2.5, 2.7, 3.0]
 
@@ -145,7 +141,7 @@ def main():
             temp = np.zeros(N)
             for j in range(N):
                 model = nn.Linear(num_dim, 1, bias=False)
-                opt = Adam(model.parameters(), lr=learning_rate)
+                opt = SGD(model.parameters(), lr=learning_rate, weight_decay=args.l2)
                 x_train, y_train = datasets.make_blobs(n_samples=train_size, n_features=num_dim,
                     centers=[np.full((num_dim),-mu) ,np.full((num_dim),mu)],cluster_std=sigma)
                 x_train = torch.FloatTensor(x_train)

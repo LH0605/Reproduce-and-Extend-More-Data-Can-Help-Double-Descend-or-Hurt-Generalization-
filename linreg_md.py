@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.utils.data as Data
-from torch.optim import SGD
+from torch.optim import Adam
 
 learning_rate = 1e-1
 N = 300
@@ -35,8 +35,8 @@ def fgm(model, x, y, epsilon):
     model.zero_grad()
     loss.backward()
     grad = x.grad.data
-    norm_x = torch.norm(grad, 2)
-    return epsilon * grad/norm_x
+    norm = grad.norm(dim=1, p=2)[:, None]
+    return epsilon * grad/norm
 
 def pgd(model, x, y, epsilon):
     alpha = epsilon / 3.
@@ -114,7 +114,7 @@ def main():
     e_test = torch.randn(TEST_SIZE)
     if args.gaussian:
         epsilons = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.5, 2.0, 2.5, 3.0]
-        BEST_MODEL_PATH = f'best_lreg_{num_dim}d_{args.attack}_{round(args.l2, 2)}_model_gaussian.pt'
+        BEST_MODEL_PATH = f'best_linreg_{num_dim}d_{args.attack}_{round(args.l2, 2)}_gaussian.pt'
         num_epochs = 300
         x_test = torch.randn(TEST_SIZE, num_dim)
     else:
@@ -136,10 +136,7 @@ def main():
             temp = np.zeros(N)
             for j in range(N):
                 model = nn.Linear(num_dim, 1, bias=False)
-                if args.l2:
-                    opt = SGD(model.parameters(), lr=learning_rate, weight_decay=args.l2)
-                else:
-                    opt = SGD(model.parameters(), lr=learning_rate, weight_decay=args.l2)
+                opt = Adam(model.parameters(), lr=learning_rate, weight_decay=args.l2)
                 e_train = torch.randn(train_size)
                 if args.gaussian:
                     x_train = torch.randn(train_size, num_dim)

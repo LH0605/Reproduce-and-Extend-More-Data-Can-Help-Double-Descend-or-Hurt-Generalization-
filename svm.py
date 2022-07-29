@@ -1,7 +1,6 @@
 import argparse
 from time import process_time
 import numpy as np
-from sklearn import datasets
 import torch
 import torch.nn as nn
 import torch.utils.data as Data
@@ -13,6 +12,8 @@ num_epochs = 100
 N = 300
 TEST_SIZE = 100
 TRAIN_SIZE = 30
+
+# Andrew Ng's SVM lectures for better understanding: https://youtube.com/playlist?list=PLNeKWBMsAzboNdqcm4YY9x7Z2s9n9q_Tb
 
 def train_hinge_loss(x, y, weight, bias):
     loss = torch.mean(torch.clamp(1 - y * (x @ weight - bias), min=0))
@@ -39,8 +40,8 @@ def fgm(model, x, y, epsilon):
     model.zero_grad()
     loss.backward()
     grad = x.grad.data
-    norm_x = torch.norm(grad, 2)
-    return epsilon * grad/norm_x
+    norm = grad.norm(dim=1, p=2)[:, None]
+    return epsilon * grad/norm
 
 def pgd(model, x, y, epsilon):
     alpha = epsilon / 3.
@@ -59,7 +60,7 @@ def pgd(model, x, y, epsilon):
         adv_x = x + delta
     return delta
 
-def fit(num_epochs, train_loader, test_loader, model, opt, attack, train_size, epsilon):
+def fit(num_epochs, train_loader, test_loader, model, opt, attack, epsilon):
     model.train()
     best_loss = float('inf')
     count = 0
@@ -118,8 +119,6 @@ def main():
     x_test = torch.cat([torch.distributions.MultivariateNormal(-mu, sigma).sample((TEST_SIZE,)), torch.distributions.MultivariateNormal(mu, sigma).sample((TEST_SIZE,))]).float()	
     y_test = torch.unsqueeze(torch.cat([-torch.ones(TEST_SIZE), torch.ones(TEST_SIZE)]), dim=1).float()	
     test_set = Data.TensorDataset(x_test, y_test)
-    test_loader = Data.DataLoader(dataset=test_set, batch_size=TEST_SIZE//10, shuffle=False)
-    test_set = Data.TensorDataset(x_test, y_test)
     test_loader = Data.DataLoader(dataset=test_set, batch_size=TEST_SIZE, shuffle=False)
     test_losses = np.zeros((len(epsilons), TRAIN_SIZE))
     mins = np.zeros((len(epsilons), TRAIN_SIZE))
@@ -136,7 +135,7 @@ def main():
                 y_train = torch.unsqueeze(torch.cat([-torch.ones(train_size), torch.ones(train_size)]), dim=1).float()
                 train_set = Data.TensorDataset(x_train, y_train)
                 train_loader = Data.DataLoader(dataset=train_set, batch_size=train_size, shuffle=True)
-                test_loss = fit(num_epochs, train_loader, test_loader, model, opt, args.attack, train_size, epsilon)
+                test_loss = fit(num_epochs, train_loader, test_loader, model, opt, args.attack, epsilon)
                 temp[j] = test_loss.item()
             mn = np.amin(temp)
             mx = np.amax(temp)

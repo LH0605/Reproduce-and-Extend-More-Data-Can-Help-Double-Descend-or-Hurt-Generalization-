@@ -1,5 +1,6 @@
 import argparse
 from time import process_time
+from math import sqrt
 import numpy as np
 from sklearn import datasets
 import torch
@@ -45,7 +46,7 @@ def fgm(model, x, y, epsilon):
     loss.backward()
     grad = x.grad.data
     norm = grad.norm(dim=1, p=2)[:, None]
-    return epsilon * grad/norm
+    return epsilon * sqrt(num_dim) * grad/norm
 
 def pgd(model, x, y, epsilon):
     alpha = epsilon / 3.

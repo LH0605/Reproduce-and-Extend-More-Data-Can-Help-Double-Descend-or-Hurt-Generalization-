@@ -7,11 +7,13 @@ import torch.nn as nn
 from torch.optim import Adam
 import matplotlib.pyplot as plt
 
-num_epochs = 300
+num_epochs = 100
 learning_rate = 1e-1
-N = 300
+N = 100
 TEST_SIZE = 100
 TRAIN_SIZE = 30
+
+# inspiration from https://github.com/swyoon/pytorch-minimal-gaussian-process/blob/main/gp.py
 
 class GP(nn.Module):
     def __init__(self, length_scale=1., noise_scale=1., amplitude_scale=1.):
@@ -40,7 +42,7 @@ class GP(nn.Module):
         v = torch.linalg.solve(L, k)
         mu = k.T.mm(alpha)
         var = self.amplitude_scale + self.noise_scale - torch.diag(v.T.mm(v))
-        return mu, var
+        return mu, torch.sqrt(var)
 
     def fit(self, X, y):
         """should be called before forward() call.
@@ -69,10 +71,8 @@ class GP(nn.Module):
         """ Construct FGSM adversarial examples on the examples X with L_infinity norm"""
         X.requires_grad = True
         loss = -self.fit(X, y).sum()
-        # print('loss', loss)
         self.zero_grad()
         loss.backward()
-        # print('grad', X.grad.data.sign())
         return epsilon * X.grad.data.sign()
     
     def train_step(self, X, y, opt, epsilon):
@@ -84,12 +84,8 @@ class GP(nn.Module):
         loss = -self.fit(X_pert, y).sum()
         loss.backward()
         opt.step()
-        # return {'loss': nll.item(), 'length': self.length_scale.detach().cpu(), 
-        #         'noise': self.noise_scale.detach().cpu(), 
-        #         'amplitude': self.amplitude_scale.detach().cpu()}
 
 def mse_loss(output, target):
-    # print('mse', target.size(), output.size())
     return torch.pow(torch.abs(target-output), 2).sum()
 
 def main():
@@ -124,11 +120,11 @@ def main():
                 model.train()
                 for epoch in range(num_epochs):
                     model.train_step(x_train, y_train, opt, epsilon)
-                mu, var = model.forward(x_test)
+                mu, std = model.forward(x_test)
                 if (train_size == TRAIN_SIZE) and (j == N-1):
                     print('eps', epsilon)
                     print('mu', mu)
-                    print('var', var)
+                    print('std', std)
                 
                 model.eval()
                 test_loss = mse_loss(mu, y_test) / TEST_SIZE

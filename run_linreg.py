@@ -5,8 +5,8 @@ from subprocess import Popen, PIPE
 def run_linreg_dim(dim):
     print(f'dim: {dim}')
     attack = "fgm"
-    # cmd = f"nice -n 10 python3 linreg_md.py --gaussian --attack {attack} --ndim {dim} > linreg_gaussian_{attack}_{dim}d.log"
-    cmd = f"nice -n 10 python3 linreg_md.py --attack {attack} --ndim {dim} > linreg_poisson_{attack}_{dim}d.log"
+    cmd = f"nice -n 10 python3 linreg_md.py --gaussian --attack {attack} --ndim {dim} > linreg_gaussian_{attack}_{dim}d.log"
+    # cmd = f"nice -n 10 python3 linreg_md.py --attack {attack} --ndim {dim} > linreg_poisson_{attack}_{dim}d.log"
     proc = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
     res = proc.communicate()
     if proc.returncode != 0:

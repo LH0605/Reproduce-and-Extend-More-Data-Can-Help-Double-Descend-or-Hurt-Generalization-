@@ -6,7 +6,7 @@ from sklearn import datasets
 import torch
 import torch.nn as nn
 import torch.utils.data as Data
-from torch.optim import SGD
+from torch.optim import Adam
 
 mu = 1
 sigma = 2
@@ -120,7 +120,7 @@ def main():
     num_dim = args.ndim
     BEST_MODEL_PATH = f'lin_{args.attack}_{num_dim}D_{int(args.l2*100)}_model.pt'
     print(BEST_MODEL_PATH)
-    epsilons = [0, 0.1, 0.3, 0.5, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.3, 1.5, 1.7, 2.0]
+    epsilons = [0.1, 0.3, 0.5, 0.8, 0.9, 1.0, 1.3, 1.5, 2.0]
     # epsilons = [0, 0.3, 0.5, 0.7, 1.1, 1.3, 1.5, 2.5, 2.7, 3.0]
 
     x_test, y_test = datasets.make_blobs(n_samples=TEST_SIZE, n_features=num_dim,
@@ -133,8 +133,6 @@ def main():
     test_loader = Data.DataLoader(dataset=test_set, batch_size=TEST_SIZE, shuffle=False)
 
     test_losses = np.zeros((len(epsilons), TRAIN_SIZE))
-    mins = np.zeros((len(epsilons), TRAIN_SIZE))
-    maxs = np.zeros((len(epsilons), TRAIN_SIZE))
     tic = process_time()
     for i in range(len(epsilons)):
         epsilon = epsilons[i]
@@ -142,7 +140,7 @@ def main():
             temp = np.zeros(N)
             for j in range(N):
                 model = nn.Linear(num_dim, 1, bias=False)
-                opt = SGD(model.parameters(), lr=learning_rate, weight_decay=args.l2)
+                opt = Adam(model.parameters(), lr=learning_rate, weight_decay=args.l2)
                 x_train, y_train = datasets.make_blobs(n_samples=train_size, n_features=num_dim,
                     centers=[np.full((num_dim),-mu) ,np.full((num_dim),mu)],cluster_std=sigma)
                 x_train = torch.FloatTensor(x_train)
@@ -152,16 +150,10 @@ def main():
                 train_loader = Data.DataLoader(dataset=train_set, batch_size=train_size, shuffle=True)
                 test_loss = fit(num_epochs, train_loader, test_loader, model, opt, args.attack, train_size, epsilon)
                 temp[j] = test_loss.item()
-            mn = np.amin(temp)
-            mx = np.amax(temp)
-            mins[i, train_size-1] = mn
-            maxs[i, train_size-1] = mx
             mean = np.mean(temp)
             test_losses[i, train_size-1] = mean
     toc = process_time()
     print("elapsed time:", toc - tic)
-    print("mins:", mins)
-    print("maxs:", maxs)
     print("test_losses:", test_losses)
 
 if __name__ == "__main__":

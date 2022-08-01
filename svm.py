@@ -42,7 +42,7 @@ def fgm(model, x, y, epsilon):
     loss.backward()
     grad = x.grad.data
     norm = grad.norm(dim=1, p=2)[:, None]
-    return epsilon * sqrt(num_dim) * grad/norm
+    return epsilon * grad/norm # * sqrt(num_dim)
 
 def pgd(model, x, y, epsilon):
     alpha = epsilon / 3.
@@ -122,8 +122,6 @@ def main():
     test_set = Data.TensorDataset(x_test, y_test)
     test_loader = Data.DataLoader(dataset=test_set, batch_size=TEST_SIZE, shuffle=False)
     test_losses = np.zeros((len(epsilons), TRAIN_SIZE))
-    mins = np.zeros((len(epsilons), TRAIN_SIZE))
-    maxs = np.zeros((len(epsilons), TRAIN_SIZE))
     tic = process_time()
     for i in range(len(epsilons)):
         epsilon = epsilons[i]
@@ -138,16 +136,10 @@ def main():
                 train_loader = Data.DataLoader(dataset=train_set, batch_size=train_size, shuffle=True)
                 test_loss = fit(num_epochs, train_loader, test_loader, model, opt, args.attack, epsilon)
                 temp[j] = test_loss.item()
-            mn = np.amin(temp)
-            mx = np.amax(temp)
-            mins[i, train_size-1] = mn
-            maxs[i, train_size-1] = mx
             mean = np.mean(temp)
             test_losses[i, train_size-1] = mean.item()
     toc = process_time()
     print("elapsed time:", toc - tic)
-    print("mins:", mins)
-    print("maxs:", maxs)
     print("test_losses:", test_losses)
 
     step = 3
